@@ -4,6 +4,8 @@ from typing import  Dict
 import base64
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
+import urllib.parse
+
 
 
 class login_error(Exception):
@@ -15,23 +17,41 @@ class cookie_invalid_error(login_error):
     """Cookie无效异常"""
     pass
 
+headers = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+    'Accept-Language': 'zh-CN,zh;q=0.9',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Pragma': 'no-cache',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0',
+    'sec-ch-ua': '"Chromium";v="136", "Microsoft Edge";v="136", "Not.A/Brand";v="99"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+}
 
 class login:
-    def __init__(self):
+    def __init__(self,base_url="https://sso.bit.edu.cn/cas/login"):
+        self.base_url = base_url
+        self.host = base_url.split('/')[2]
         self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        })
+        self.session.headers.update(headers)
     
+    def get_url(self, callback_url: str) -> str:
+        url = self.base_url + f"?service={urllib.parse.quote(callback_url)}"
+        return url
+        
     def init_login(self,callback_url="") -> Dict[str, str]:
         """
         登录初始化，获取salt、execution和cookie
         """
-        url = f"https://sso.bit.edu.cn/cas/login?service={callback_url}"
-        print(f"正在访问登录页面: {url}")
-        
+        url = self.get_url(callback_url)
         try:
-            response = self.session.get(url)
+            response = self.session.get(url,headers=headers)
             response.raise_for_status()
             
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -46,6 +66,7 @@ class login:
             
             # 获取cookies
             cookies = response.headers.get('Set-Cookie', '')
+            
             return {
                 'salt': salt,
                 'execution': execution,
@@ -79,8 +100,8 @@ class login:
         """
         执行登录并返回cookies
         """
-        url = f"https://sso.bit.edu.cn/cas/login?service={callback_url}"
-        
+        url = self.get_url(callback_url)
+                
         # 加密密码
         encrypted_password = self.encrypt_password(password, salt)
         
@@ -96,13 +117,15 @@ class login:
             'geolocation': ""
         }
         
-        headers = {
+        _headers = {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive',
             'Pragma': 'no-cache',
-            'Host': 'sso.bit.edu.cn',
+            'Origin': "https://webvpn.bit.edu.cn" if "webvpn.bit.edu.cn" in callback_url else "https://sso.bit.edu.cn",
+            'Host': self.host,
+            'Referrer': url,
             'Sec-Fetch-Dest': 'document',
             'Sec-Fetch-Mode': 'navigate',
             'Sec-Fetch-Site': 'same-origin',
@@ -114,12 +137,12 @@ class login:
             'sec-ch-ua-platform': '"Windows"',
             'Cookie': cookie
         }
+        self.session.headers.update(_headers)
         try:
-            response = self.session.post(url, data=form_data, headers=headers, allow_redirects=False)
+            response = self.session.post(url, data=form_data, headers=_headers, allow_redirects=False)
             # 检查是否登录成功
-            if "帐号登录或动态码登录" in response.text:
+            if "通行密钥认证" in response.text:
                 raise login_error("webvpn login error: 登录失败")
-            
             # 返回所有cookies
             all_cookies = {}
             for cookie in self.session.cookies:
@@ -156,10 +179,8 @@ class login:
         完整登录流程,返回cookies及回调地址
         """
         init_data = self.init_login(callback_url)
-        
         captcha = self.encrypt_password("{}",init_data['salt'])
         
-        # 4. 执行登录
         res = self.base_login(
             username=username,
             password=password,
@@ -169,6 +190,74 @@ class login:
             salt=init_data['salt'],
             callback_url=callback_url
         )
-        
         return res
+
+
+class webvpn_login:
+    def __init__(self):
+        self._login = login("https://webvpn.bit.edu.cn/https/77726476706e69737468656265737421e3e44ed225397c1e7b0c9ce29b5b/cas/login")
+    
+    def login(self,username,password,session=None):
+        """
+            登录并获取Cookie
+            :param username: 学号
+            :param password: 密码
+            :return: Cookie字符串
+        """
+        res = self._login.login(username,password,callback_url="https://webvpn.bit.edu.cn/login?cas_login=true")
+        if not session: session = requests.Session()
+        session.headers.update(headers)
+        session.headers.update({
+            "Cookie":res['cookie']
+        })
+        r=session.get(res["callback"])
+        if "通行密钥认证" in r.text:
+            raise login_error("未成功登录!")
+        return res['cookie']
+        
+        
+class jwb_login:
+    def __init__(self):
+        self._webvpn_login = webvpn_login()
+        
+    def login(self,username,password):
+        """
+            登录并获取Cookie
+            :param username: 学号
+            :param password: 密码
+            :return: Cookie字符串
+        """
+        session = requests.Session()
+        cookie=self._webvpn_login.login(username, password,session)
+        r=session.get("https://webvpn.bit.edu.cn/https/77726476706e69737468656265737421e3e44ed225397c1e7b0c9ce29b5b/cas/login?service=http%3A%2F%2Fjwms.bit.edu.cn%2F")
+        if "通行密钥认证" in r.text:
+            raise login_error("未成功登录!")
+        return "; ".join([f"{k}={v}" for k, v in session.cookies.get_dict().items()])
+        
+class ibit_login:
+    def __init__(self):
+        self._login = login()
+
+    def login(self,username, password):
+        data = self._login.login(username, password,callback_url="https://ibit.yanhekt.cn/proxy/v1/cas/callback")
+        cookies = data['cookie_json']
+        headers={
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0',
+            'sec-ch-ua': '"Chromium";v="136", "Microsoft Edge";v="136", "Not.A/Brand";v="99"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+        }
+        badge = requests.get(data["callback"],headers=headers,allow_redirects=0).headers["Location"].split("badgeFromPc=")[1]
+        badge = urllib.parse.unquote(badge)
+        cookies["badge_2"] = badge
+        return cookies
+    
 
