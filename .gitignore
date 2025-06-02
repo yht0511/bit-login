@@ -1,2 +1,5 @@
 test.py
 __pycache__/
+dist/
+build/
+bit_login.egg-info/
