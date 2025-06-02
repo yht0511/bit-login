@@ -1,0 +1,8 @@
+README.md
+setup.py
+bit-login/__init__.py
+bit-login/login.py
+bit_login.egg-info/PKG-INFO
+bit_login.egg-info/SOURCES.txt
+bit_login.egg-info/dependency_links.txt
+bit_login.egg-info/top_level.txt
