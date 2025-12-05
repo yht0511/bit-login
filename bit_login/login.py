@@ -213,7 +213,11 @@ class webvpn_login:
         r=session.get(res["callback"])
         if "通行密钥认证" in r.text:
             raise login_error("未成功登录!")
-        return res['cookie']
+        res = {
+            "cookie_json": session.cookies.get_dict(),
+            "cookie": "; ".join([f"{k}={v}" for k, v in session.cookies.get_dict().items()]),
+        }
+        return res
         
         
 class jwb_login:
@@ -232,7 +236,11 @@ class jwb_login:
         r=session.get("https://webvpn.bit.edu.cn/https/77726476706e69737468656265737421e3e44ed225397c1e7b0c9ce29b5b/cas/login?service=http%3A%2F%2Fjwms.bit.edu.cn%2F")
         if "通行密钥认证" in r.text:
             raise login_error("未成功登录!")
-        return "; ".join([f"{k}={v}" for k, v in session.cookies.get_dict().items()])
+        res = {
+            "cookie_json": session.cookies.get_dict(),
+            "cookie": "; ".join([f"{k}={v}" for k, v in session.cookies.get_dict().items()])
+        }
+        return res
         
 class ibit_login:
     def __init__(self):
@@ -241,23 +249,113 @@ class ibit_login:
     def login(self,username, password):
         data = self._login.login(username, password,callback_url="https://ibit.yanhekt.cn/proxy/v1/cas/callback")
         cookies = data['cookie_json']
-        headers={
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-            'Accept-Language': 'zh-CN,zh;q=0.9',
-            'Connection': 'keep-alive',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1',
-            'Upgrade-Insecure-Requests': '1',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0',
-            'sec-ch-ua': '"Chromium";v="136", "Microsoft Edge";v="136", "Not.A/Brand";v="99"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"Windows"',
-        }
         badge = requests.get(data["callback"],headers=headers,allow_redirects=0).headers["Location"].split("badgeFromPc=")[1]
         badge = urllib.parse.unquote(badge)
         cookies["badge_2"] = badge
-        return cookies
+        res = {
+            "cookie_json": cookies,
+            "cookie": "; ".join([f"{k}={v}" for k, v in cookies.items()])
+        }
+        return res
     
 
+class yanhekt_login:
+    def __init__(self):
+        self._login = login()
+
+    def login(self,username, password):
+        data = self._login.login(username, password,callback_url="https://cbiz.yanhekt.cn/v1/cas/callback")
+        cookies = data['cookie_json']
+        token = requests.get(data["callback"],headers=headers,allow_redirects=0).headers["Location"].split("token=")[1].split("&")[0]
+        res = {
+            "token": token,
+            "cookie_json": cookies,
+            "cookie": "; ".join([f"{k}={v}" for k, v in cookies.items()])
+        }
+        return res
+        
+
+class library_login:
+    """登录图书馆
+    """
+    def __init__(self):
+        self._login = login()
+
+    def login(self,username, password):
+        headers = {
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+            'Connection': 'keep-alive',
+            'Content-Type': 'application/json',
+            'Origin': 'https://seatlib.bit.edu.cn',
+            'Referer': 'https://seatlib.bit.edu.cn/h5/index.html',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
+            'X-Requested-With': 'XMLHttpRequest',
+            'sec-ch-ua': '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"macOS"',
+        }
+        data = self._login.login(username, password,callback_url="https://seatlib.bit.edu.cn/api/cas/cas")
+        c = self._login.session.get(data["callback"],allow_redirects=0).headers
+        cookies = {
+            'PHPSESSID': c["Set-Cookie"].split("PHPSESSID=")[1].split(";")[0],
+        }
+        headers["Refer"]='https://sso.bit.edu.cn/cas/login?service=https:%2F%2Fseatlib.bit.edu.cn%2Fapi%2Fcas%2Fcas'
+        response = requests.get('https://seatlib.bit.edu.cn/api/cas/cas', cookies=cookies, headers=headers,allow_redirects=0)
+        cas = response.headers["Location"].split("cas=")[1]
+        json_data = {
+            'cas': cas
+        }
+        response = requests.post('https://seatlib.bit.edu.cn/api/cas/user', cookies=cookies, headers=headers, json=json_data).json()
+        if response.get("code") != 1:
+            raise login_error("图书馆登录失败!")
+        res = {
+            "cookie_json": cookies,
+            "cookie": "; ".join([f"{k}={v}" for k, v in cookies.items()]),
+            "user_info": response["member"],
+            "token": response["member"]["token"]
+        }
+        return res
+
+
+class dekt_login:
+    """登陆第二课堂,暂时无法使用
+    """
+    def __init__(self):
+        self._login = login()
+        
+    def login(self,username,password):
+        """
+            登录并获取Cookie
+            暂时无法使用
+            :param username: 学号
+            :param password: 密码
+            :return: Cookie字符串
+        """
+        headers = {
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+            'Connection': 'keep-alive',
+            'Content-Type': 'application/json',
+            'Origin': 'https://qcbldekt.bit.edu.cn',
+            'Referer': 'https://qcbldekt.bit.edu.cn/',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
+            'X-Requested-With': 'XMLHttpRequest',
+            'sec-ch-ua': '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"macOS"',
+        }
+        data=self._login.login(username,password,callback_url="https://qcbldekt.bit.edu.cn/cas/login")
+        self._login.session.get(data["callback"],allow_redirects=1)
+        res = {
+            "cookie_json": self._login.session.cookies.get_dict(),
+            "cookie": "; ".join([f"{k}={v}" for k, v in self._login.session.cookies.get_dict().items()]),
+        }
+        return res
+        
