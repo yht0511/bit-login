@@ -76,5 +76,5 @@ class jxzxehall:
             print(f"选择学期:{DM}")
         else: DM = kksj
         # 获取课程
-        res = self.session.post(f'{CONFIG['urls']['campus']['jxzxehall_app']}/jwapp/sys/wdkbby/modules/xskcb/cxxszhxqkb.do',params={"XNXQDM":DM}).json() # 获取课程数据
+        res = self.session.post(f"{CONFIG['urls']['campus']['jxzxehall_app']}/jwapp/sys/wdkbby/modules/xskcb/cxxszhxqkb.do",params={"XNXQDM":DM}).json() # 获取课程数据
         return res
