@@ -221,6 +221,50 @@ def get_courses(request: JxzxehallCoursesRequest):
     )
     return {"data": result}
 
+@app.post("/api/jwb/cookies", summary="Get JWB login cookies")
+def get_jwb_cookies(request: BaseCredentials):
+    """
+    Get raw cookies after logging into JWB system.
+    """
+    # 获取（或创建）会话
+    session = get_service_session(
+        jwb_login, 
+        request.username, 
+        request.password, 
+        'jwb'
+    )
+    
+    # 提取 cookies 并转换为字典返回
+    try:
+        print(session.cookies,session.headers)
+        cookies_dict = session.cookies.get_dict()
+        return {"data": cookies_dict}
+    except Exception as e:
+        logger.error(f"Failed to extract cookies for JWB: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to extract cookies from session")
+    
+@app.post("/api/jxzxehall/cookies", summary="Get JXZXEHALL login cookies")
+def get_jxzxehall_cookies(request: BaseCredentials):
+    """
+    Get raw cookies after logging into JXZXEHALL (教学中心) system.
+    """
+    # 获取（或创建）会话
+    session = get_service_session(
+        jxzxehall_login, 
+        request.username, 
+        request.password, 
+        'jxzxehall'
+    )
+    
+    # 提取 cookies 并转换为字典返回
+    try:
+        cookies_dict = session.cookies.get_dict()
+        return {"data": cookies_dict}
+    except Exception as e:
+        logger.error(f"Failed to extract cookies for JXZXEHALL: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to extract cookies from session")
+
+
 if __name__ == "__main__":
     # For local testing
     uvicorn.run("server:app", host="0.0.0.0", port=16384, reload=True)
