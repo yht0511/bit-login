@@ -61,9 +61,12 @@ class login:
 
             separator = "&" if "?" in callback_url else "?"
             final_url = f"{callback_url}{separator}ticket={ticket}"
-            
-            r_login = self.session.get(final_url, allow_redirects=False)
-            next_url = r_login.headers.get('Location', final_url)
+
+            next_url = final_url
+            try: 
+                r_login = self.session.get(final_url, allow_redirects=False)
+                next_url = r_login.headers.get('Location', final_url)
+            except: pass
 
             return {
                 "cookie_json": self.session.cookies.get_dict(),
@@ -77,4 +80,6 @@ class login:
                 raise login_error(f"登录异常: {e}")
             else: 
                 raise login_error(str(e))
+
+
 
