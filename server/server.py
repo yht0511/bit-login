@@ -7,7 +7,11 @@ import time
 import functools
 from fastapi.middleware.cors import CORSMiddleware
 import re
-
+import os
+import uuid
+import threading
+import glob
+from fastapi.staticfiles import StaticFiles
 # Import bit-login components
 from bit_login.service import jwb_login, jxzxehall_login
 from bit_login.services.jwb import jwb
@@ -26,6 +30,9 @@ app = FastAPI(
     description="High concurrency RESTful API for BIT services",
     version="1.0.0"
 )
+
+os.makedirs("/tmp", exist_ok=True)
+app.mount("/tmp", StaticFiles(directory="/tmp"), name="tmp")
 
 # 允许的域名列表
 ALLOWED_ORIGINS = [
@@ -272,6 +279,76 @@ def get_jxzxehall_cookies(request: BaseCredentials):
         logger.error(f"Failed to extract cookies for JXZXEHALL: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to extract cookies from session")
 
+import glob
+
+ICS_FILES = {}
+
+@app.post("/api/jxzxehall/schedule_ics", summary="Generate ICS schedule file")
+def generate_schedule_ics(request: JxzxehallCoursesRequest):
+    global ICS_FILES
+    ics_content, note = execute_service(
+        jxzxehall_login, jxzxehall, 
+        request.username, request.password, 'jxzxehall', 
+        'generate_ics', 
+        kksj=request.kksj
+    )
+    
+    file_uuid = str(uuid.uuid4())
+    file_path = f"/tmp/{file_uuid}.ics"
+    os.makedirs("/tmp", exist_ok=True)
+    
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(ics_content)
+
+    ICS_FILES[file_uuid] = {
+        "url": f"https://bit-login.teclab.org.cn/tmp/{file_uuid}.ics",
+        "file": file_path,
+        "generated": time.time()
+    }
+        
+    return {
+        "url": f"https://bit-login.teclab.org.cn/tmp/{file_uuid}.ics",
+        "note": note,
+        "msg": "获取成功OvO"
+    }
+
+def clear_ics_files():
+    """后台定时清理过期的 ics 文件及字典记录"""
+    global ICS_FILES
+    while True:
+        time.sleep(30)
+        current_time = time.time()
+        expired_keys = []
+        
+        for k, v in list(ICS_FILES.items()):
+            if current_time - v["generated"] > 30 * 60: # 30 min
+                expired_keys.append(k)
+                
+        for k in expired_keys:
+            file_path = ICS_FILES[k]['file']
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except Exception as e:
+                logger.error(f"Failed to delete {file_path}: {str(e)}")
+            finally:
+                ICS_FILES.pop(k, None)
+
+@app.on_event("startup")
+def startup_event():
+    for f in glob.glob("/tmp/*.ics"):
+        try:
+            os.remove(f)
+        except:
+            pass
+        
+    clear_thread = threading.Thread(target=clear_ics_files)
+    clear_thread.daemon = True
+    clear_thread.start()
+    logger.info("ICS cleanup background thread started.")
+
 if __name__ == "__main__":
-    # For local testing
+    uvicorn.run("server:app", host="0.0.0.0", port=16384, reload=True)
+
+if __name__ == "__main__":
     uvicorn.run("server:app", host="0.0.0.0", port=16384, reload=True)
