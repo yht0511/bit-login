@@ -31,6 +31,8 @@ app = FastAPI(
 ALLOWED_ORIGINS = [
     "https://bit101.cn",
     "http://bit101.cn",
+    "http://127.0.0.1:3000",
+    "http://localhost:3000",
 ]
 
 
@@ -224,9 +226,8 @@ def get_courses(request: JxzxehallCoursesRequest):
 @app.post("/api/jwb/cookies", summary="Get JWB login cookies")
 def get_jwb_cookies(request: BaseCredentials):
     """
-    Get raw cookies after logging into JWB system.
+    Get raw cookies after logging into JWB system and return formatted strings.
     """
-    # 获取（或创建）会话
     session = get_service_session(
         jwb_login, 
         request.username, 
@@ -234,21 +235,26 @@ def get_jwb_cookies(request: BaseCredentials):
         'jwb'
     )
     
-    # 提取 cookies 并转换为字典返回
     try:
-        print(session.cookies,session.headers)
         cookies_dict = session.cookies.get_dict()
-        return {"data": cookies_dict}
+        cookie_list = [f"{k}={v};" for k, v in cookies_dict.items()]
+        cookie_str = "\n".join(cookie_list)+" Path=/; Domain=webvpn.bit.edu.cn; HttpOnly"
+        
+        return {
+            "data": cookies_dict,
+            "cookie_str": cookie_str,
+            "cookie_list": cookie_list
+        }
     except Exception as e:
         logger.error(f"Failed to extract cookies for JWB: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to extract cookies from session")
-    
+
+
 @app.post("/api/jxzxehall/cookies", summary="Get JXZXEHALL login cookies")
 def get_jxzxehall_cookies(request: BaseCredentials):
     """
-    Get raw cookies after logging into JXZXEHALL (教学中心) system.
+    Get raw cookies after logging into JXZXEHALL (教学中心) system and return formatted strings.
     """
-    # 获取（或创建）会话
     session = get_service_session(
         jxzxehall_login, 
         request.username, 
@@ -256,14 +262,19 @@ def get_jxzxehall_cookies(request: BaseCredentials):
         'jxzxehall'
     )
     
-    # 提取 cookies 并转换为字典返回
     try:
         cookies_dict = session.cookies.get_dict()
-        return {"data": cookies_dict}
+        cookie_list = [f"{k}={v};" for k, v in cookies_dict.items()]
+        cookie_str = "\n".join(cookie_list)+" Path=/; Domain=webvpn.bit.edu.cn; HttpOnly"
+
+        return {
+            "data": cookies_dict,
+            "cookie_str": cookie_str,
+            "cookie_list": cookie_list
+        }
     except Exception as e:
         logger.error(f"Failed to extract cookies for JXZXEHALL: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to extract cookies from session")
-
 
 if __name__ == "__main__":
     # For local testing
