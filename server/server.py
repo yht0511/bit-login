@@ -41,8 +41,8 @@ app.add_middleware(
     allow_origins=ALLOWED_ORIGINS,       # 基础白名单
     allow_origin_regex=r'^https?://[a-zA-Z0-9\-]+\.bit101\.cn$',  # 子域名通配
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # --- Pydantic Models ---
