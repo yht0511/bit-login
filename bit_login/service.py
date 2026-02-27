@@ -19,9 +19,9 @@ class BaseLogin:
         global network_initialized,webvpn_mode
         print("Initializing network...",end=" ",flush=True)
         if check_network_env():
-            CONFIG["urls"]["active"] = CONFIG["urls"]["campus"].update(CONFIG["urls"]["base"])
+            CONFIG["urls"]["active"] = CONFIG["urls"]["campus"].copy()
         else:
-            CONFIG["urls"]["active"] = CONFIG["urls"]["webvpn"]
+            CONFIG["urls"]["active"] = CONFIG["urls"]["webvpn"].copy()
             webvpn_mode = True
         CONFIG["urls"]["active"].update(CONFIG["urls"]["base"])
         network_initialized = True

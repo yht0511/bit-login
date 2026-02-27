@@ -69,9 +69,9 @@ class jxzxehall:
     def get_courses(self,kksj=None):
         print("正在获取课程表...")
         if not kksj:
-            self.session.headers["Referer"] = f"{CONFIG['urls']['campus']['jwb_referer']}jsxsd/framework/xsMain.jsp"
-            url = f'{CONFIG['urls']['campus']['jxzxehall_app']}/jwapp/sys/wdkbby/modules/jshkcb/xnxqcx.do'
-            res = self.session.get(url).json() # 获取学期
+            headers = {"Referer": f"{CONFIG['urls']['campus']['jwb_referer']}jsxsd/framework/xsMain.jsp"}
+            url = f"{CONFIG['urls']['campus']['jxzxehall_app']}/jwapp/sys/wdkbby/modules/jshkcb/xnxqcx.do"
+            res = self.session.get(url, headers=headers).json() # 获取学期
             DM=res["datas"]["xnxqcx"]["rows"][0]["DM"]
             print(f"选择学期:{DM}")
         else: DM = kksj
