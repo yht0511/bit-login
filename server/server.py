@@ -1,12 +1,10 @@
 import uvicorn
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import Optional
 import logging
 import time
-import functools
 from fastapi.middleware.cors import CORSMiddleware
-import re
 import os
 import uuid
 import threading
@@ -37,6 +35,8 @@ ALLOWED_ORIGINS = [
     "http://bit101.cn",
     "http://127.0.0.1:3000",
     "http://localhost:3000",
+    "https://deploy-preview-57--bit101-demo.netlify.app",
+    "http://deploy-preview-57--bit101-demo.netlify.app"
 ]
 
 
