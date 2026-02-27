@@ -90,7 +90,7 @@ def check_network_env():
     """检查网络环境,校园网返回True
     """
     try:
-        requests.get("http://10.0.0.55",timeout=1)
+        requests.get("http://10.0.0.55",timeout=3)
         return True
     except:
         return False

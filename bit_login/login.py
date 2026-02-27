@@ -17,7 +17,7 @@ class login:
         })
         self.base_url = base_url if base_url else CONFIG["urls"]["base"]["sso_api"]
     
-    def _get_tgt(self, username, password) -> str:
+    def _get_tgt(self, username, password, retries=0) -> str:
         """获取 Ticket Granting Ticket"""
         headers = {'Content-Type': CONFIG["common"]["content_type_form"]}
         
@@ -28,7 +28,9 @@ class login:
         )
         
         if r.status_code == 401: raise login_error("登录失败: 账号或密码错误")
-        if r.status_code != 201: raise login_error(f"TGT获取失败: {r.status_code}")
+        if r.status_code != 201: 
+            if retries>5: raise login_error(f"TGT获取失败: {r.status_code}")
+            return self._get_tgt(username,password,retries+1)
 
         tgt = r.headers.get('Location')
         if not tgt:
@@ -39,7 +41,7 @@ class login:
         return tgt
 
 
-    def login(self, username: str, password: str, callback_url: str = "", webvpn_mode=False) -> Dict[str, Any]:
+    def login(self, username: str, password: str, callback_url: str = "", webvpn_mode=False,retries=0) -> Dict[str, Any]:
         try:
             # 1. 获取 TGT
             tgt_url = self._get_tgt(username, password)
@@ -49,7 +51,8 @@ class login:
             r_st = self.session.post(tgt_url, data={'service': callback_url}, headers=headers)
             
             if r_st.status_code != 200: 
-                raise login_error(f"ST获取失败: {r_st.status_code}")
+                if retries>5: raise login_error(f"ST获取失败: {r_st.status_code}")
+                return self.login(username,password,callback_url,webvpn_mode,retries+1)
             
             ticket = r_st.text.strip()
 
@@ -70,5 +73,8 @@ class login:
         except requests.RequestException as e:
             raise login_error(f"网络请求异常: {e}")
         except Exception as e:
-            raise login_error(f"登录异常: {e}")
+            if "登录异常: " not in str(e):
+                raise login_error(f"登录异常: {e}")
+            else: 
+                raise login_error(str(e))
 
