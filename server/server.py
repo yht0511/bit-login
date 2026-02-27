@@ -11,7 +11,7 @@ import os
 import uuid
 import threading
 import glob
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 # Import bit-login components
 from bit_login.service import jwb_login, jxzxehall_login
 from bit_login.services.jwb import jwb
@@ -30,9 +30,6 @@ app = FastAPI(
     description="High concurrency RESTful API for BIT services",
     version="1.0.0"
 )
-
-os.makedirs("/tmp", exist_ok=True)
-app.mount("/tmp", StaticFiles(directory="/tmp"), name="tmp")
 
 # 允许的域名列表
 ALLOWED_ORIGINS = [
@@ -311,6 +308,23 @@ def generate_schedule_ics(request: JxzxehallCoursesRequest):
         "note": note,
         "msg": "获取成功OvO"
     }
+
+@app.get("/tmp/{filename}", summary="Download ICS file")
+def download_ics(filename: str):
+    """专门处理 /tmp/ 目录下的 ics 文件下载"""
+    if not filename.endswith(".ics"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+        
+    file_path = f"/tmp/{filename}"
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found or expired")
+    
+    return FileResponse(
+        path=file_path, 
+        filename="课程表.ics",        
+        media_type="text/calendar", 
+        content_disposition_type="attachment" 
+    )
 
 def clear_ics_files():
     """后台定时清理过期的 ics 文件及字典记录"""
