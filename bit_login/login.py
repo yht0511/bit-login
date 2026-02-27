@@ -2,6 +2,7 @@ import requests
 import re
 from typing import Dict, Any
 from .config import CONFIG
+from .utils import convert_to_webvpn_url
 
 class login_error(Exception):
     """BIT登录通用异常"""
@@ -14,13 +15,14 @@ class login:
         self.session.headers.update({
             'User-Agent': CONFIG["common"]["ua"]
         })
+        self.base_url = base_url if base_url else CONFIG["urls"]["base"]["sso_api"]
     
     def _get_tgt(self, username, password) -> str:
         """获取 Ticket Granting Ticket"""
         headers = {'Content-Type': CONFIG["common"]["content_type_form"]}
         
         r = self.session.post(
-            CONFIG["urls"]["sso_api"], 
+            self.base_url, 
             data={'username': username, 'password': password},
             headers=headers
         )
@@ -36,7 +38,8 @@ class login:
         if not tgt: raise login_error("无法解析 TGT URL")
         return tgt
 
-    def login(self, username: str, password: str, callback_url: str = "") -> Dict[str, Any]:
+
+    def login(self, username: str, password: str, callback_url: str = "", webvpn_mode=False) -> Dict[str, Any]:
         try:
             # 1. 获取 TGT
             tgt_url = self._get_tgt(username, password)
@@ -51,6 +54,8 @@ class login:
             ticket = r_st.text.strip()
 
             # 3. 验证 Ticket 并建立 Session
+            if webvpn_mode: callback_url = convert_to_webvpn_url(callback_url)
+
             separator = "&" if "?" in callback_url else "?"
             final_url = f"{callback_url}{separator}ticket={ticket}"
             

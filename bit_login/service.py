@@ -1,179 +1,204 @@
 import requests
 import urllib.parse
 from .config import CONFIG
+from .utils import check_network_env,convert_to_webvpn_url
 from .login import login, login_error
 
-class webvpn_login:
-    """WebVPN 服务"""
+network_initialized = False
+webvpn_mode = False
+
+class BaseLogin:
+    """登录服务基类"""
     def __init__(self):
-        self._login = login()
+        self._sso_login = login()
+        if not network_initialized: self.initialize_network()
+        self.initialized = False
+        self.result = None
+
+    def initialize_network(self):
+        global network_initialized,webvpn_mode
+        print("Initializing network...",end=" ",flush=True)
+        if check_network_env():
+            CONFIG["urls"]["active"] = CONFIG["urls"]["campus"].update(CONFIG["urls"]["base"])
+        else:
+            CONFIG["urls"]["active"] = CONFIG["urls"]["webvpn"]
+            webvpn_mode = True
+        CONFIG["urls"]["active"].update(CONFIG["urls"]["base"])
+        network_initialized = True
+        print("✅ Done.")
+
+    def _login(self, username, password):
+        """具体登录逻辑子类实现"""
+        raise NotImplementedError
     
-    def login(self, username, password, session=None):
-        res = self._login.login(username, password, callback_url=CONFIG["urls"]["webvpn_cb"])
-        if not session: 
-            session = requests.Session()
-        session.cookies.update(res['cookie_json'])
+    def patch_webvpn(self,username,password,callback):
+        """WebVPN环境下,拿到callback之后直接替换session
+        """
+        if webvpn_mode:
+            callback = convert_to_webvpn_url(callback)
+            self._webvpn_login = webvpn_login()
+            self._webvpn_login.login(username,password)
+            self._sso_login.session = self._webvpn_login.get_session()
+        return callback
+
+    def login(self, username, password):
+        """登录(支持链式调用)"""
+        self.result = self._login(username, password)
+        self.initialized = True
+        return self
+
+    def get_session(self):
+        """获取登录后的Session对象"""
+        if not self.initialized:
+            raise Exception("未登录!")
+        return self._sso_login.session
+
+    def get_result(self)->dict:
+        """获取登录后的返回结果数据"""
+        if not self.initialized:
+            raise Exception("未登录!")
+        return self.result
+
+    def _get_cookies_result(self):
+        """通用格式化Cookie输出"""
+        cookies = self._sso_login.session.cookies.get_dict()
+        return {
+            "cookie_json": cookies,
+            "cookie": "; ".join([f"{k}={v}" for k, v in cookies.items()])
+        }
+
+class webvpn_login(BaseLogin):
+    """WebVPN 服务"""
+    def _login(self, username, password):
+        """WebVPN登录逻辑"""
+        res = self._sso_login.login(username, password, callback_url=CONFIG["urls"]["webvpn"]["webvpn_cb"], webvpn_mode=True)
+        if res["callback"][0]=='/': res["callback"] = CONFIG["urls"]["webvpn"]["webvpn_origin"]+res["callback"]
+        self._sso_login.session.get(res["callback"])
         return res
 
-class jwb_login:
+class jwb_login(BaseLogin):
     """教务系统"""
-    def __init__(self):
-        self._login = login()
-        
-    def login(self, username, password):
-        res = self._login.login(username, password, callback_url=CONFIG["urls"]["jwb_cb"])
-        
-        headers = CONFIG["headers"]["jwb"].copy()
-        headers["Referer"] = CONFIG["urls"]["jwb_referer"]
-        
-        self._login.session.get(res["callback"], headers=headers)
-        return {
-            "cookie_json": self._login.session.cookies.get_dict(),
-            "cookie": "; ".join([f"{k}={v}" for k, v in self._login.session.cookies.items()])
-        }
     
-class jxzxehall_login:
-    """教学中心/一站式大厅"""
-    def __init__(self):
-        self._login = login()
-        
-    def login(self, username, password):
-        # 1. 预请求获取动态 callback
+    def _login(self, username, password):
+        """教务系统登录逻辑"""
+        res = self._sso_login.login(username, password, callback_url=CONFIG["urls"]["campus"]["jwb_cb"])
+        res["callback"] = self.patch_webvpn(username,password,res["callback"])
+        headers = CONFIG["headers"]["jwb"].copy()
+        self._sso_login.session.get(res["callback"], headers=headers)
+        return self._get_cookies_result()
+    
+class jxzxehall_login(BaseLogin):
+    """教学中心/一站式大厅(直连)"""
+    def _login(self, username, password):
+        """教学中心登录逻辑"""
         headers = CONFIG["headers"]["jxzxehall"]
-        r_pre = requests.get(CONFIG["urls"]["jxzxehall_auth"], allow_redirects=False, headers=headers)
-        
+        r_pre = requests.get(CONFIG["urls"]["campus"]["jxzxehall_auth"], allow_redirects=False, headers=headers)
         try:
             raw_service = r_pre.headers["Location"].split("?service=")[-1]
             callback_url = urllib.parse.unquote(raw_service)
         except Exception:
             raise login_error("jxzxehall: 解析 service url 失败")
+        res = self._sso_login.login(username, password, callback_url=callback_url)
+        self._sso_login.session.get(res["callback"], headers=headers)
+        self._sso_login.session.get(CONFIG["urls"]["campus"]["jxzxehall_app_base"])
+        self._sso_login.session.get(CONFIG["urls"]["campus"]["jxzxehall_config"], headers=headers)
+        return self._get_cookies_result()
 
-        # 2. CAS 登录
-        res = self._login.login(username, password, callback_url=callback_url)
-        
-        # 3. 必须的链式调用
-        self._login.session.get(res["callback"], headers=headers)
-        self._login.session.get(CONFIG["urls"]["jxzxehall_app_base"])
-        self._login.session.get(CONFIG["urls"]["jxzxehall_config"], headers=headers)
-        
-        return {
-            "cookie_json": self._login.session.cookies.get_dict(),
-            "cookie": "; ".join([f"{k}={v}" for k, v in self._login.session.cookies.items()])
-        }
-
-class ibit_login:
-    """iBIT 手机端聚合页"""
-    def __init__(self):
-        self._login = login()
-
-    def login(self, username, password):
-        data = self._login.login(username, password, callback_url=CONFIG["urls"]["ibit_cb"])
-        # 尝试提取 badge
+class ibit_login(BaseLogin):
+    """iBIT(直连)"""
+    def _login(self, username, password):
+        """iBIT登录逻辑"""
+        data = self._sso_login.login(username, password, callback_url=CONFIG["urls"]["campus"]["ibit_cb"])
+        self._sso_login.session.get(data["callback"])
         try:
             qs = urllib.parse.urlparse(data["callback"]).query
             badge = urllib.parse.parse_qs(qs).get('badgeFromPc', [''])[0]
             if badge:
                 data['cookie_json']['badge_2'] = badge
                 data['cookie'] += f"; badge_2={badge}"
+                self._sso_login.session.headers.update({"Badge": badge,'badge': badge, 'Xdomain-Client': 'web_user',"Referer":f"https://ibit.yanhekt.cn/desktop?badgeFromPc={badge}"}) # 自动携带
+                print(self._sso_login.session.headers)
         except Exception:
             pass
         return data
 
-class yanhekt_login:
+class yanhekt_login(BaseLogin):
     """延河课堂"""
-    def __init__(self):
-        self._login = login()
-
-    def login(self, username, password):
-        data = self._login.login(username, password, callback_url=CONFIG["urls"]["yanhekt_cb"])
-        
+    def _login(self, username, password):
+        """延河课堂登录逻辑"""
+        data = self._sso_login.login(username, password, callback_url=CONFIG["urls"]["campus"]["yanhekt_cb"])
         token = ""
         try:
-            # 优先从 query 参数取，兜底从字符串分割取
             qs = urllib.parse.urlparse(data["callback"]).query
             token = urllib.parse.parse_qs(qs).get('token', [''])[0]
             if not token and 'token=' in data['callback']:
                 token = data['callback'].split('token=')[1].split('&')[0]
+            self._sso_login.session.headers.update({
+                'Authorization': f'Bearer {token}',
+                'Origin': 'https://www.yanhekt.cn',
+                'Referer': 'https://www.yanhekt.cn/',
+                'Xdomain-Client': 'web_user',
+            })
         except Exception:
             pass
-            
-        if not token: raise login_error("Yanhekt Token 解析失败")
-        
+        if not token: 
+            raise login_error("Yanhekt Token 解析失败")
         return {
             "token": token,
             "cookie_json": data['cookie_json'],
             "cookie": data['cookie']
         }
 
-class library_login:
+class library_login(BaseLogin):
     """图书馆"""
-    def __init__(self):
-        self._login = login()
-
-    def login(self, username, password):
-        # 1. 设置专用头
+    def _login(self, username, password):
+        """图书馆登录逻辑"""
         lib_headers = CONFIG["headers"]["library"].copy()
         lib_headers.update({
             'Content-Type': CONFIG["common"]["content_type_json"],
-            'Origin': CONFIG["urls"]["lib_origin"],
-            'Referer': CONFIG["urls"]["lib_referer"]
+            'Origin': CONFIG["urls"]["campus"]["lib_origin"],
+            'Referer': CONFIG["urls"]["campus"]["lib_referer"]
         })
-        self._login.session.headers.update(lib_headers)
-
-        # 2. 预检
-        try: self._login.session.get(CONFIG["urls"]["lib_cas"])
-        except: pass
-
-        # 3. 伪装 Referer 并登录
-        cas_service = CONFIG["urls"]["lib_cas"]
-        self._login.session.headers['Referer'] = f"{CONFIG['urls']['sso_login_ui']}?service={urllib.parse.quote(cas_service)}"
-        
-        # 核心登录
-        data = self._login.login(username, password, callback_url=cas_service)
-        
-        # 4. 提取 CAS Ticket
+        self._sso_login.session.headers.update(lib_headers)
+        try: 
+            self._sso_login.session.get(CONFIG["urls"]["campus"]["lib_cas"])
+        except: 
+            pass
+        cas_service = CONFIG["urls"]["campus"]["lib_cas"]
+        self._sso_login.session.headers['Referer'] = f"{CONFIG['urls']['base']['sso_login_ui']}?service={urllib.parse.quote(cas_service)}"
+        data = self._sso_login.login(username, password, callback_url=cas_service)
         callback_url = data['callback']
         cas_ticket = ""
-        
-        # 尝试从 URL Fragment 或 Location 中提取
         if 'cas=' in callback_url:
             cas_ticket = callback_url.split('cas=')[1].split('&')[0]
         else:
             try:
-                r_retry = self._login.session.get(cas_service, allow_redirects=False)
+                r_retry = self._sso_login.session.get(cas_service, allow_redirects=False)
                 loc = r_retry.headers.get('Location', '')
-                if 'cas=' in loc: cas_ticket = loc.split('cas=')[1].split('&')[0]
-            except: pass
-
-        if not cas_ticket: raise login_error(f"图书馆登录失败: 未获取到 CAS Ticket (Url: {callback_url})")
-
-        # 5. 换取最终 Token
+                if 'cas=' in loc: 
+                    cas_ticket = loc.split('cas=')[1].split('&')[0]
+            except: 
+                pass
+        if not cas_ticket: 
+            raise login_error(f"图书馆登录失败: 未获取到 CAS Ticket (Url: {callback_url})")
         try:
-            self._login.session.headers['Referer'] = CONFIG["urls"]["lib_referer"]
-            resp = self._login.session.post(CONFIG["urls"]["lib_auth"], json={'cas': cas_ticket}).json()
-
+            self._sso_login.session.headers['Referer'] = CONFIG["urls"]["campus"]["lib_referer"]
+            resp = self._sso_login.session.post(CONFIG["urls"]["campus"]["lib_auth"], json={'cas': cas_ticket}).json()
             if resp.get("code") != 1:
                 raise login_error(f"图书馆授权失败: {resp.get('msg')}")
-            
-            cookies = self._login.session.cookies.get_dict()
-            return {
-                "cookie_json": cookies,
-                "cookie": "; ".join([f"{k}={v}" for k, v in cookies.items()]),
+            res = self._get_cookies_result()
+            res.update({
                 "user_info": resp.get("member", {}),
                 "token": resp.get("member", {}).get("token")
-            }
+            })
+            return res
         except Exception as e:
             raise login_error(f"图书馆 API 解析失败: {e}")
 
-class dekt_login:
+class dekt_login(BaseLogin):
     """第二课堂"""
-    def __init__(self):
-        self._login = login()
-        
-    def login(self, username, password):
-        data = self._login.login(username, password, callback_url=CONFIG["urls"]["dekt_cb"])
-        self._login.session.get(data["callback"], allow_redirects=True)
-        return {
-            "cookie_json": self._login.session.cookies.get_dict(),
-            "cookie": "; ".join([f"{k}={v}" for k, v in self._login.session.cookies.items()]),
-        }
+    def _login(self, username, password):
+        """第二课堂登录逻辑(尚不可用)"""
+        data = self._sso_login.login(username, password, callback_url=CONFIG["urls"]["campus"]["dekt_cb"])
+        self._sso_login.session.get(data["callback"], allow_redirects=True)
+        return self._get_cookies_result()
