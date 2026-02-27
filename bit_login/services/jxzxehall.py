@@ -123,9 +123,12 @@ class jxzxehall:
             if v.get("XQ") == 1:
                 first_day = v.get("RQ")
                 break
-
+        
+        self.session.headers.update({
+            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,ja;q=0.7"
+        })
         schedule_res = self.session.post(
-            f"{CONFIG['urls']['active']['jxzxehall_app']}/jwapp/sys/wdkbby/modules/xskcb/cxxszhxqkb.do",
+            f"{CONFIG['urls']['active']['jxzxehall_app']}/jwapp/sys/wdkbby/modules/xskcb/cxxszhxqkb.do?vpn-12-o2-jxzxehallapp.bit.edu.cn",
             data={"XNXQDM": term}
         ).json()
 
