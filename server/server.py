@@ -238,7 +238,7 @@ def get_jwb_cookies(request: BaseCredentials):
     try:
         cookies_dict = session.cookies.get_dict()
         cookie_list = [f"{k}={v};" for k, v in cookies_dict.items()]
-        cookie_str = "\n".join(cookie_list)+" Path=/; Domain=webvpn.bit.edu.cn; HttpOnly"
+        cookie_str = "\n".join(cookie_list)
         
         return {
             "data": cookies_dict,
@@ -265,7 +265,7 @@ def get_jxzxehall_cookies(request: BaseCredentials):
     try:
         cookies_dict = session.cookies.get_dict()
         cookie_list = [f"{k}={v};" for k, v in cookies_dict.items()]
-        cookie_str = "\n".join(cookie_list)+" Path=/; Domain=webvpn.bit.edu.cn; HttpOnly"
+        cookie_str = "\n".join(cookie_list)
 
         return {
             "data": cookies_dict,
