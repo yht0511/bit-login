@@ -5,6 +5,8 @@ from typing import Optional, List, Dict, Any
 import logging
 import time
 import functools
+from fastapi.middleware.cors import CORSMiddleware
+import re
 
 # Import bit-login components
 from bit_login.service import jwb_login, jxzxehall_login
@@ -23,6 +25,22 @@ app = FastAPI(
     title="BIT Login Services API",
     description="High concurrency RESTful API for BIT services",
     version="1.0.0"
+)
+
+# 允许的域名列表
+ALLOWED_ORIGINS = [
+    "https://bit101.cn",
+    "http://bit101.cn",
+]
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,       # 基础白名单
+    allow_origin_regex=r'^https?://[a-zA-Z0-9\-]+\.bit101\.cn$',  # 子域名通配
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # --- Pydantic Models ---
