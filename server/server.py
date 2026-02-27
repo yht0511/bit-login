@@ -237,13 +237,11 @@ def get_jwb_cookies(request: BaseCredentials):
     
     try:
         cookies_dict = session.cookies.get_dict()
-        cookie_list = [f"{k}={v};" for k, v in cookies_dict.items()]
-        cookie_str = "\n".join(cookie_list)
+        cookie_str = "; ".join([f"{k}={v}" for k, v in cookies_dict.items()])
         
         return {
             "data": cookies_dict,
-            "cookie_str": cookie_str,
-            "cookie_list": cookie_list
+            "cookie_str": cookie_str
         }
     except Exception as e:
         logger.error(f"Failed to extract cookies for JWB: {str(e)}")
@@ -264,13 +262,11 @@ def get_jxzxehall_cookies(request: BaseCredentials):
     
     try:
         cookies_dict = session.cookies.get_dict()
-        cookie_list = [f"{k}={v};" for k, v in cookies_dict.items()]
-        cookie_str = "\n".join(cookie_list)
+        cookie_str = "; ".join([f"{k}={v}" for k, v in cookies_dict.items()])
 
         return {
             "data": cookies_dict,
             "cookie_str": cookie_str,
-            "cookie_list": cookie_list
         }
     except Exception as e:
         logger.error(f"Failed to extract cookies for JXZXEHALL: {str(e)}")
