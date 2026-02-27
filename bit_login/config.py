@@ -34,6 +34,7 @@ CONFIG = {
             "yanhekt_cb": "https://webvpn.bit.edu.cn/https/77726476706e69737468656265737421f3f548866929695e760d82b8d6562d/v1/cas/callback",
             "dekt_cb": "https://webvpn.bit.edu.cn/https/77726476706e69737468656265737421e1f4439023356344300a80b8d6502720f3cfc1/cas/login",
             "jxzxehall_auth": "https://webvpn.bit.edu.cn/https/77726476706e69737468656265737421faef5b842238695c72468ba58c1b26316e8e7f6f/auth-protocol-core/login?service=https%3A%2F%2Fjxzxehallapp.bit.edu.cn%2Fjwapp%2Fsys%2Fxsfacx%2F*default%2Findex.do",
+            "jxzxehall_app": "https://webvpn.bit.edu.cn/https/77726476706e69737468656265737421faef5b842238695c720999bcd6572a216b231105adc27d",
             "jxzxehall_app_base": "https://webvpn.bit.edu.cn/https/77726476706e69737468656265737421faef5b842238695c720999bcd6572a216b231105adc27d/jwapp/sys/xsfacx/*default/index.do",
             "jxzxehall_course": "https://webvpn.bit.edu.cn/https/77726476706e69737468656265737421faef5b842238695c720999bcd6572a216b231105adc27d/",
             "jxzxehall_config": "https://webvpn.bit.edu.cn/https/77726476706e69737468656265737421faef5b842238695c720999bcd6572a216b231105adc27d/jwapp/sys/funauthapp/api/getAppConfig/xsfacx-4766859113956613.do?v=08260885168155102",

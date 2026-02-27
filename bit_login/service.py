@@ -39,6 +39,7 @@ class BaseLogin:
             self._webvpn_login = webvpn_login()
             self._webvpn_login.login(username,password)
             self._sso_login.session = self._webvpn_login.get_session()
+            self._webvpn_cookie = self._webvpn_login.get_session().cookies
         return callback
 
     def login(self, username, password):
@@ -99,9 +100,10 @@ class jxzxehall_login(BaseLogin):
         except Exception:
             raise login_error("jxzxehall: 解析 service url 失败")
         res = self._sso_login.login(username, password, callback_url=callback_url)
+        res["callback"] = self.patch_webvpn(username,password,res["callback"])
         self._sso_login.session.get(res["callback"], headers=headers)
-        self._sso_login.session.get(CONFIG["urls"]["campus"]["jxzxehall_app_base"])
-        self._sso_login.session.get(CONFIG["urls"]["campus"]["jxzxehall_config"], headers=headers)
+        self._sso_login.session.get(CONFIG["urls"]["active"]["jxzxehall_app_base"])
+        self._sso_login.session.get(CONFIG["urls"]["active"]["jxzxehall_config"], headers=headers)
         return self._get_cookies_result()
 
 class ibit_login(BaseLogin):
@@ -109,15 +111,15 @@ class ibit_login(BaseLogin):
     def _login(self, username, password):
         """iBIT登录逻辑"""
         data = self._sso_login.login(username, password, callback_url=CONFIG["urls"]["campus"]["ibit_cb"])
-        self._sso_login.session.get(data["callback"])
         try:
+            r_login = self._sso_login.session.get(data["callback"], allow_redirects=False)
+            data["callback"] = r_login.headers.get('Location', data["callback"])
             qs = urllib.parse.urlparse(data["callback"]).query
             badge = urllib.parse.parse_qs(qs).get('badgeFromPc', [''])[0]
             if badge:
                 data['cookie_json']['badge_2'] = badge
                 data['cookie'] += f"; badge_2={badge}"
                 self._sso_login.session.headers.update({"Badge": badge,'badge': badge, 'Xdomain-Client': 'web_user',"Referer":f"https://ibit.yanhekt.cn/desktop?badgeFromPc={badge}"}) # 自动携带
-                print(self._sso_login.session.headers)
         except Exception:
             pass
         return data
@@ -129,6 +131,8 @@ class yanhekt_login(BaseLogin):
         data = self._sso_login.login(username, password, callback_url=CONFIG["urls"]["campus"]["yanhekt_cb"])
         token = ""
         try:
+            r_login = self._sso_login.session.get(data["callback"], allow_redirects=False)
+            data["callback"] = r_login.headers.get('Location', data["callback"])
             qs = urllib.parse.urlparse(data["callback"]).query
             token = urllib.parse.parse_qs(qs).get('token', [''])[0]
             if not token and 'token=' in data['callback']:
@@ -167,6 +171,8 @@ class library_login(BaseLogin):
         cas_service = CONFIG["urls"]["campus"]["lib_cas"]
         self._sso_login.session.headers['Referer'] = f"{CONFIG['urls']['base']['sso_login_ui']}?service={urllib.parse.quote(cas_service)}"
         data = self._sso_login.login(username, password, callback_url=cas_service)
+        r_login = self._sso_login.session.get(data["callback"], allow_redirects=False)
+        data["callback"] = r_login.headers.get('Location', data["callback"])
         callback_url = data['callback']
         cas_ticket = ""
         if 'cas=' in callback_url:

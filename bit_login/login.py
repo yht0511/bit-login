@@ -60,18 +60,13 @@ class login:
             if webvpn_mode: callback_url = convert_to_webvpn_url(callback_url)
 
             separator = "&" if "?" in callback_url else "?"
-            final_url = f"{callback_url}{separator}ticket={ticket}"
+            callback = f"{callback_url}{separator}ticket={ticket}"
 
-            next_url = final_url
-            try: 
-                r_login = self.session.get(final_url, allow_redirects=False)
-                next_url = r_login.headers.get('Location', final_url)
-            except: pass
 
             return {
                 "cookie_json": self.session.cookies.get_dict(),
                 "cookie": "; ".join([f"{k}={v}" for k, v in self.session.cookies.items()]),
-                "callback": next_url 
+                "callback": callback
             }
         except requests.RequestException as e:
             raise login_error(f"网络请求异常: {e}")

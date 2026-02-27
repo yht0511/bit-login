@@ -27,7 +27,7 @@ class jxzxehall:
         self.session = session
 
     def get_student_data(self):
-        response = self.session.get(f'{CONFIG["urls"]["campus"]["jxzxehall_app"]}/jwapp/sys/xsfacx/modules/pyfacxepg/grpyfacx.do')
+        response = self.session.get(f'{CONFIG["urls"]["active"]["jxzxehall_app"]}/jwapp/sys/xsfacx/modules/pyfacxepg/grpyfacx.do')
         res_json = response.json()
         data = {
             "name": res_json["datas"]["grpyfacx"]["rows"][0]["XM"],
@@ -69,12 +69,12 @@ class jxzxehall:
     def get_courses(self,kksj=None):
         print("正在获取课程表...")
         if not kksj:
-            headers = {"Referer": f"{CONFIG['urls']['campus']['jwb_referer']}jsxsd/framework/xsMain.jsp"}
-            url = f"{CONFIG['urls']['campus']['jxzxehall_app']}/jwapp/sys/wdkbby/modules/jshkcb/xnxqcx.do"
+            headers = {"Referer": f"{CONFIG['urls']['active']['jwb_referer']}jsxsd/framework/xsMain.jsp"}
+            url = f"{CONFIG['urls']['active']['jxzxehall_app']}/jwapp/sys/wdkbby/modules/jshkcb/xnxqcx.do"
             res = self.session.get(url, headers=headers).json() # 获取学期
             DM=res["datas"]["xnxqcx"]["rows"][0]["DM"]
             print(f"选择学期:{DM}")
         else: DM = kksj
         # 获取课程
-        res = self.session.post(f"{CONFIG['urls']['campus']['jxzxehall_app']}/jwapp/sys/wdkbby/modules/xskcb/cxxszhxqkb.do",params={"XNXQDM":DM}).json() # 获取课程数据
+        res = self.session.post(f"{CONFIG['urls']['active']['jxzxehall_app']}/jwapp/sys/wdkbby/modules/xskcb/cxxszhxqkb.do",params={"XNXQDM":DM}).json() # 获取课程数据
         return res

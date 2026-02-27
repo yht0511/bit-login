@@ -1,7 +1,7 @@
 import bit_login
 
-username = "用户"
-password = "密码"
+username = ""
+password = ""
 
 
 print("========== 开始测试登录模块 ==========")
@@ -20,7 +20,7 @@ print("✅ PASS: JWB\n")
 
 print("Testing: JXZXEHALL (教学中心/一站式大厅)")
 print(bit_login.jxzxehall.jxzxehall(bit_login.jxzxehall_login().login(username=username, password=password).get_session()).get_credit())
-# print(bit_login.jxzxehall.jxzxehall(bit_login.jxzxehall_login().login(username=username, password=password).get_session()).get_courses())
+print(bit_login.jxzxehall.jxzxehall(bit_login.jxzxehall_login().login(username=username, password=password).get_session()).get_courses())
 print("✅ PASS: JXZXEHALL\n")
 
 print("Testing: IBIT (iBIT 手机端聚合页)")
