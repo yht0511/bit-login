@@ -58,6 +58,43 @@ bash start.sh
 gunicorn server:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
 ```
 
+### 🐳 Docker 部署
+
+如果你更喜欢使用 Docker，我们也提供了 Dockerfile 支持一键构建和部署。
+
+#### 1. 构建镜像
+
+在项目根目录下执行以下命令：
+
+```bash
+docker build -t bit-login-server -f server/Dockerfile .
+```
+
+#### 2. 启动容器
+
+```bash
+docker run -d -p 16384:16384 --name bit-login-server bit-login-server
+```
+
+服务启动后，可以通过 `http://localhost:16384` 访问服务。
+
+#### 3. 环境变量配置
+
+支持通过环境变量调整服务配置：
+
+- `WORKERS`: Gunicorn 工作进程数 (默认: 4)
+- `PORT`: 服务端口 (默认: 16384)
+- `HOST`: 监听地址 (默认: 0.0.0.0)
+
+示例：修改端口为 8080 并设置 8 个工作进程
+
+```bash
+docker run -d -p 8080:8080 \
+  -e PORT=8080 \
+  -e WORKERS=8 \
+  bit-login-server
+```
+
 ### 接口文档
 
 所有接口均为 POST 请求，Content-Type 为 `application/json`。
