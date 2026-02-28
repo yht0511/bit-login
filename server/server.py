@@ -11,8 +11,8 @@ import threading
 import glob
 from fastapi.responses import FileResponse
 # Import bit-login components
-from bit_login.service import jwb_login, jxzxehall_login
-from bit_login.services.jwb import jwb
+from bit_login.service import jwb_login, jwb_cjd_login, jxzxehall_login
+from bit_login.services.jwb import jwb, jwb_cjd
 from bit_login.services.jxzxehall import jxzxehall
 from bit_login.login import login_error
 
@@ -57,7 +57,7 @@ class BaseCredentials(BaseModel):
 
 class JwbScoreRequest(BaseCredentials):
     kksj: Optional[str] = None
-    detailed: bool = False
+    detail: bool = False
 
 class JwbAllScoreRequest(BaseCredentials):
     detailed: bool = False
@@ -152,7 +152,7 @@ def execute_service(login_cls, service_cls, username, password, service_name, fu
             return call_service(session)
         except Exception as final_e:
             logger.error(f"Second attempt failed for {username} on {service_name}.{func_name}. Reason: {str(final_e)}")
-            raise HTTPException(status_code=500, detail=f"Service execution failed: {str(final_e)}")
+            raise HTTPException(status_code=500, detail=f"{str(final_e)}")
 
 # --- Endpoints ---
 
@@ -187,6 +187,36 @@ def get_jwb_all_score(request: JwbAllScoreRequest):
         detailed=request.detailed
     )
     return {"data": result}
+
+# --- JWB bit101 Format Services ---
+
+@app.post("/api/jwb/bit101/score", summary="Get bit101 format scores")
+def get_jwb_bit101_score(request: JwbScoreRequest):
+    """
+    Get matching bit101 format scores from JWB system.
+    """
+    result = execute_service(
+        jwb_login, jwb, 
+        request.username, request.password, 'jwb', 
+        'get_bit101_score', 
+        kksj=request.kksj, detailed=request.detail
+    )
+    return {
+        "msg": "查询成功OvO",
+        "data": result
+    }
+
+@app.post("/api/jwb/cjd/img", summary="Get all scores")
+def get_jwb_cjd_img(request: JwbAllScoreRequest):
+    """
+    Get all scores from JWB system.
+    """
+    result = execute_service(
+        jwb_cjd_login, jwb_cjd, 
+        request.username, request.password, 'jwb_cjd_img', 
+        'get_cjd'
+    )
+    return {"data": {"url": result}}
 
 # --- JXZXEHALL Services ---
 
@@ -227,6 +257,8 @@ def get_courses(request: JxzxehallCoursesRequest):
     )
     return {"data": result}
 
+
+# --- Cookies ---
 @app.post("/api/jwb/cookies", summary="Get JWB login cookies")
 def get_jwb_cookies(request: BaseCredentials):
     """
@@ -252,6 +284,30 @@ def get_jwb_cookies(request: BaseCredentials):
         raise HTTPException(status_code=500, detail="Failed to extract cookies from session")
 
 
+@app.post("/api/jwb/cjd/cookies", summary="Get JWB CJD login cookies")
+def get_jwb_cjd_cookies(request: BaseCredentials):
+    """
+    Get raw cookies after logging into JWB CJD system and return formatted strings.
+    """
+    session = get_service_session(
+        jwb_cjd_login, 
+        request.username, 
+        request.password, 
+        'jwb_cjd'
+    )
+    
+    try:
+        cookies_dict = session.cookies.get_dict()
+        cookie_str = "; ".join([f"{k}={v}" for k, v in cookies_dict.items()])
+        
+        return {
+            "data": cookies_dict,
+            "cookie_str": cookie_str
+        }
+    except Exception as e:
+        logger.error(f"Failed to extract cookies for JWBCJD: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to extract cookies from session")
+
 @app.post("/api/jxzxehall/cookies", summary="Get JXZXEHALL login cookies")
 def get_jxzxehall_cookies(request: BaseCredentials):
     """
@@ -276,7 +332,6 @@ def get_jxzxehall_cookies(request: BaseCredentials):
         logger.error(f"Failed to extract cookies for JXZXEHALL: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to extract cookies from session")
 
-import glob
 
 ICS_FILES = {}
 

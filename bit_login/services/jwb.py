@@ -98,3 +98,93 @@ class jwb:
         if not res: return []
         return res
     
+    def get_bit101_score(self, kksj=None, detailed=False):
+        """获取并返回 bit101 格式的成绩数据"""
+        if kksj is None: kksj = ''
+        data = {
+            'kksj': kksj,
+            'kcxz': '',
+            'kcmc': '',
+            'xsfs': 'all',
+        }
+        response = self.session.post(f'{CONFIG["urls"]["active"]["jwb_cb"]}jsxsd/kscj/cjcx_list', data=data)
+        return self.parse_bit101_score(response.text, detailed=detailed)
+
+    def parse_bit101_score(self, data, detailed=False):
+        """解析 HTML 并转化为 bit101 需要的二维数组结构"""
+        parser = BeautifulSoup(data, 'html.parser')
+        dataList = parser.find(id='dataList')
+        if dataList is None: return []
+        
+        rows = dataList.find_all('tr')
+        if len(rows) == 0: return []
+        
+        # 定义表头
+        base_header = [
+            "序号", "开课学期", "课程编号", "课程名称", "成绩", "成绩标识", 
+            "学分", "总学时", "考试性质", "考核方式", "课程属性", "课程性质", 
+            "课程归属", "课程种类", "是否第一次考试", "操作栏"
+        ]
+        detail_header = [
+            "专业人数", "学习人数", "平均分", "本人成绩", "班级人数", "最高分", 
+            "该课程所有教学班成绩录入完毕", "本人成绩在班级中占", "本人成绩在专业中占", "本人成绩在所有学生中占"
+        ]
+        
+        header = base_header + detail_header if detailed else base_header
+        res = [header]
+        
+        for tr in rows[1:]:
+            tds = tr.find_all('td')
+            row_data = [td.text.strip() for td in tds]
+            
+            while len(row_data) < 16:
+                row_data.append("")
+            row_data = row_data[:16]
+            
+            score = row_data[4]
+            if score == '优秀': row_data[4] = '95'
+            elif score == '良好': row_data[4] = '85'
+            elif score == '中等': row_data[4] = '75'
+            elif score == '及格': row_data[4] = '65'
+            elif score == '不及格': row_data[4] = '0'
+            
+            if detailed:
+                detail_list = [""] * 10
+                a_tag = tds[-1].find('a') if len(tds) > 0 else None
+                if a_tag and "onclick" in a_tag.attrs:
+                    try:
+                        onclick_str = a_tag["onclick"]
+                        detail_url = CONFIG["urls"]["active"]["jwb_cb"] + onclick_str.split("JsMod('")[1].split("'")[0][1:]
+                        detail_data = self.get_score_detail(detail_url)
+                        
+                        detail_list[2] = detail_data.get('average', '')
+                        detail_list[5] = detail_data.get('max', '')
+                        detail_list[7] = detail_data.get('class_proportion', '')
+                        detail_list[8] = detail_data.get('major_proportion', '')
+                        detail_list[9] = detail_data.get('school_proportion', '')
+                    except Exception:
+                        pass
+                row_data.extend(detail_list)
+                
+            res.append(row_data)
+            
+        return res
+
+    def get_all_bit101_score(self, detailed=False) -> list:
+        """获取所有学期的 bit101 格式成绩"""
+        res = self.get_bit101_score("", detailed=detailed)
+        if not res: return []
+        return res
+    
+class jwb_cjd:
+    def __init__(self,session):
+        self.session = session
+
+    def get_cjd(self,gpa=True):
+        require_gpa = 1 if gpa else 0
+        res = self.session.get(f"https://jwb.bit.edu.cn/cjd/ScoreReport2/Index?GPA={require_gpa}").text
+        if "以下显示的是本次申请的成绩信息" not in res:
+            raise Exception("成绩单获取失败!")
+        img_url = "https://jwb.bit.edu.cn/cjd/Temp/"+res.split("<img src=\"/cjd/Temp/")[1].split('" class="img-fluid w-100" a')[0]
+        return img_url
+        

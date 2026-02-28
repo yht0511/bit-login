@@ -3,6 +3,7 @@ import urllib.parse
 from .config import CONFIG
 from .utils import check_network_env,convert_to_webvpn_url
 from .login import login, login_error
+from urllib.parse import unquote
 
 network_initialized = False
 webvpn_mode = False
@@ -87,7 +88,15 @@ class jwb_login(BaseLogin):
         headers = CONFIG["headers"]["jwb"].copy()
         self._sso_login.session.get(res["callback"], headers=headers)
         return self._get_cookies_result()
-    
+
+class jwb_cjd_login(BaseLogin):
+    """教务系统成绩单"""
+    def _login(self, username, password):
+        r1 = self._sso_login.session.get("https://jwb.bit.edu.cn/cjd/Account/ExternalLogin",allow_redirects=False)
+        res = self._sso_login.login(username, password, callback_url=unquote(r1.headers["Location"].split("?service=")[-1]))
+        self._sso_login.session.get(res["callback"])
+        return self._get_cookies_result()
+
 class jxzxehall_login(BaseLogin):
     """教学中心/一站式大厅(直连)"""
     def _login(self, username, password):

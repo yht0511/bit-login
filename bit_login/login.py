@@ -69,12 +69,9 @@ class login:
                 "callback": callback
             }
         except requests.RequestException as e:
-            raise login_error(f"网络请求异常: {e}")
+            raise login_error(e)
         except Exception as e:
-            if "登录异常: " not in str(e):
-                raise login_error(f"登录异常: {e}")
-            else: 
-                raise login_error(str(e))
+            raise login_error(str(e))
 
 
 
