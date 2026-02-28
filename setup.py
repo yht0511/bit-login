@@ -16,7 +16,7 @@ setuptools.setup(
     install_requires=[
         "beautifulsoup4>=4.14.3",
         "cryptography>=46.0.5",
-        "fastapi>=0.134.0",
+        "fastapi>=0.128.0",
         "pydantic>=2.12.5",
         "requests>=2.32.5",
         "uvicorn>=0.41.0"
