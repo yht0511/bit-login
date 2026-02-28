@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="bit_login", 
-    version="3.3.0",
+    version="3.3.1",
     author="teclab",   
     author_email="admin@teclab.org.cn",
     description="北京理工大学统一身份验证登录模块",
@@ -14,12 +14,11 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     packages=setuptools.find_packages(),
     install_requires=[
-        "beautifulsoup4>=4.14.3",
-        "cryptography>=46.0.5",
-        "fastapi>=0.134.0",
-        "pydantic>=2.12.5",
-        "requests>=2.32.5",
-        "uvicorn>=0.41.0"
+        "beautifulsoup4",
+        "cryptography",
+        "fastapi",
+        "pydantic",
+        "requests"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

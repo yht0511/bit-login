@@ -1,5 +1,5 @@
 import base64
-import requests
+import socket
 from urllib.parse import urlparse, urlunparse
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
@@ -89,8 +89,9 @@ def decrypt_password(s: str) -> str:
 def check_network_env():
     """检查网络环境,校园网返回True
     """
+    target_domain = "jwms.bit.edu.cn"
     try:
-        requests.get("http://10.0.0.55",timeout=3)
+        socket.gethostbyname(target_domain)
         return True
-    except:
+    except socket.gaierror:
         return False
