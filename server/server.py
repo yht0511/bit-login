@@ -71,25 +71,55 @@ class SessionManager:
     def __init__(self):
         self._cache = {}  # (username, service_name): (session, timestamp)
         self._ttl = 1800  # 30 minutes (Session timeout)
+        self._lock = threading.Lock()
 
     def get_session(self, username, service_name):
         key = (username, service_name)
-        if key in self._cache:
-            session, timestamp = self._cache[key]
-            if time.time() - timestamp < self._ttl:
-                return session
-            else:
-                del self._cache[key]
+        with self._lock:
+            if key in self._cache:
+                session, timestamp = self._cache[key]
+                if time.time() - timestamp < self._ttl:
+                    return session
+                else:
+                    try:
+                        del self._cache[key]
+                        session.close()
+                    except:
+                        pass
         return None
 
     def set_session(self, username, service_name, session):
         key = (username, service_name)
-        self._cache[key] = (session, time.time())
+        with self._lock:
+            self._cache[key] = (session, time.time())
 
     def invalidate(self, username, service_name):
         key = (username, service_name)
-        if key in self._cache:
-            del self._cache[key]
+        with self._lock:
+            if key in self._cache:
+                del self._cache[key]
+    
+    def cleanup_expired_sessions(self):
+        """Clean up expired sessions periodically."""
+        while True:
+            time.sleep(300)  # Check every 5 minutes
+            current_time = time.time()
+            expired_keys = []
+            
+            with self._lock:
+                for key, (session, timestamp) in list(self._cache.items()):
+                    if current_time - timestamp > self._ttl:
+                        expired_keys.append(key)
+                
+                for key in expired_keys:
+                    try:
+                        session, _ = self._cache.pop(key)
+                        session.close()
+                    except KeyError:
+                        pass
+            
+            if expired_keys:
+                logger.info(f"Cleaned up {len(expired_keys)} expired sessions.")
 
 session_manager = SessionManager()
 
@@ -415,9 +445,12 @@ def startup_event():
     clear_thread.daemon = True
     clear_thread.start()
     logger.info("ICS cleanup background thread started.")
+    
+    session_cleanup_thread = threading.Thread(target=session_manager.cleanup_expired_sessions)
+    session_cleanup_thread.daemon = True
+    session_cleanup_thread.start()
+    logger.info("Session cleanup background thread started.")
 
 if __name__ == "__main__":
     uvicorn.run("server:app", host="0.0.0.0", port=16384, reload=True)
 
-if __name__ == "__main__":
-    uvicorn.run("server:app", host="0.0.0.0", port=16384, reload=True)
