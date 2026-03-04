@@ -17,19 +17,21 @@ print("✅ PASS: WEBVPN\n")
 
 print("Testing: JWB (教务系统)")
 c=0
-for i in bit_login.jwb.jwb(bit_login.jwb_login().login(username=username, password=password).get_session()).get_all_score():
+for i in bit_login.jwb.score(bit_login.jwb_login().login(username=username, password=password).get_session()).get_all_score():
     if i["credit"]: c+=float(i["credit"])
 print(f"总学分:{c}")
 print("✅ PASS: JWB\n")
 
 print("Testing: JWB_CJD (教务系统-成绩单)")
-print(bit_login.jwb.jwb_cjd(bit_login.jwb_cjd_login().login(username=username,password=password).get_session()).get_cjd())
+print(bit_login.jwb.cjd(bit_login.jwb_cjd_login().login(username=username,password=password).get_session()).get_cjd())
 print("✅ PASS: JWB\n")
 
 print("Testing: JXZXEHALL (教学中心/一站式大厅)")
-print(bit_login.jxzxehall.jxzxehall(bit_login.jxzxehall_login().login(username=username, password=password).get_session()).get_credit())
-print(bit_login.jxzxehall.jxzxehall(bit_login.jxzxehall_login().login(username=username, password=password).get_session()).get_courses())
+print(bit_login.jxzxehall.credit(bit_login.jxzxehall_login().login(username=username, password=password).get_session()).get_credit())
+print(bit_login.jxzxehall.course(bit_login.jxzxehall_login().login(username=username, password=password).get_session()).get_courses())
+# print(bit_login.jxzxehall.classroom(bit_login.jxzxehall_login().login(username=username, password=password).get_session()).get_occupancy("2026-03-04"))
 print("✅ PASS: JXZXEHALL\n")
+
 
 print("Testing: IBIT (iBIT 手机端聚合页)")
 assert '{"code":0,"message":"","data":' in bit_login.ibit_login().login(username=username, password=password).get_session().get("https://ibit.yanhekt.cn/proxy/v1/user?with_desensitize=false").text

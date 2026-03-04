@@ -14,7 +14,7 @@ def get_current_kksj():
     return semester
 
 
-class jwb:
+class score:
     def __init__(self,session):
         self.session = session
 
@@ -176,7 +176,7 @@ class jwb:
         if not res: return []
         return res
     
-class jwb_cjd:
+class cjd:
     def __init__(self,session):
         self.session = session
 

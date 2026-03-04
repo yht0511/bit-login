@@ -28,15 +28,14 @@ response = session.get("https://webvpn.bit.edu.cn/...")
 # 2. 登录教务系统 (JWB)
 jwb_login = bit_login.jwb_login().login(username, password)
 # 获取成绩
-scores = bit_login.jwb.jwb(jwb_login.get_session()).get_all_score()
+scores = bit_login.jwb.score(jwb_login.get_session()).get_all_score()
 
 # 3. 登录教学中心/一站式大厅 (JXZXEHALL)
 hall_login = bit_login.jxzxehall_login().login(username, password)
-hall_service = bit_login.jxzxehall.jxzxehall(hall_login.get_session())
 # 获取学分信息
-credits = hall_service.get_credit()
+credits = bit_login.jxzxehall.credit(hall_login.get_session()).get_credit()
 # 获取课程表
-courses = hall_service.get_courses()
+courses = bit_login.jxzxehall.courses(hall_login.get_session()).get_courses()
 
 # 4. 其他服务支持
 # - bit_login.ibit_login()      # iBIT

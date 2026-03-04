@@ -55,8 +55,8 @@ def get_building_coord(jasmc):
             return BUILDING_MAP[k]
     return None
 
-class jxzxehall:
-    """教务系统相关功能操作类"""
+class credit:
+    """教务系统学分相关功能操作类"""
     
     def __init__(self, session):
         """初始化"""
@@ -104,6 +104,13 @@ class jxzxehall:
             "required_credit": data["required_credit"],
         }
     
+
+class course:
+    """教务系统课程相关功能操作类"""
+    
+    def __init__(self, session):
+        """初始化"""
+        self.session = session
     def get_courses(self, kksj=None):
         """获取指定或当前学期课程表及排课基础数据"""
         term = kksj
@@ -193,3 +200,182 @@ class jxzxehall:
         note = f"一共添加了{schedule['term']}学期的{class_count}节课，合计坐牢时间{time_count / 60:.1f}小时（雾"
         
         return ics_content, note
+
+
+class classroom:
+    """空闲教室查询功能操作类"""
+    
+    # 状态码翻译字典
+    STATUS_MAP = {
+        "01": "排课占用",
+        "10": "排课占用(特定)",
+        "02": "考务占用",
+        "03": "其他占用",
+        "04": "借用占用",
+        "05": "调课占用",
+        "11": "特殊排课"
+    }
+
+    def __init__(self, session):
+        """初始化"""
+        self.session = session
+
+    def _parse_jc_status(self, jc_str):
+        """解析单个节次的状态码"""
+        if not jc_str:
+            return "空闲"
+            
+        occupations = []
+        for status in jc_str.split(','):
+            if status.startswith('1_'):
+                code = status.split('_')[1]
+                occupations.append(self.STATUS_MAP.get(code, f"未知占用({code})"))
+                
+        return " + ".join(occupations) if occupations else "空闲"
+
+    def _get_current_term_info(self):
+        """获取当前学期信息"""
+        url = f"{CONFIG['urls']['active']['jxzxehall_app']}/jwapp/sys/kxjas/modules/kxjas/dqxnxqcx.do"
+        try:
+            response = self.session.post(url)
+            data = response.json()
+            if 'datas' in data and 'dqxnxqcx' in data['datas']:
+                rows = data['datas']['dqxnxqcx']['rows']
+                if rows:
+                    return rows[0]
+        except Exception:
+            return None
+        return None
+
+    def _get_week_info(self, date_str, xn, xq):
+        """根据日期获取周次信息"""
+        url = f"{CONFIG['urls']['active']['jxzxehall_app']}/jwapp/sys/kxjas/modules/kxjas/rqzhzcjc.do"
+        payload = {'RQ': date_str, 'XN': xn, 'XQ': xq}
+        try:
+            response = self.session.post(url, data=payload)
+            data = response.json()
+            if 'datas' in data and 'rqzhzcjc' in data['datas']:
+                return data['datas']['rqzhzcjc']
+        except Exception:
+            return None
+        return None
+
+    def get_occupancy(self, date_str, semester=None, week=None, 
+                      campus_code=None, building_code=None, classroom_name=None):
+        """
+        获取指定日期、特定条件下的教室占用情况
+        :param date_str: 日期 'YYYY-MM-DD'
+        :param semester: 学期代码 '2025-2026-2' (可选，默认自动获取)
+        :param week: 周次 如 1 (可选，默认自动计算)
+        :param campus_code: 校区代码
+        :param building_code: 教学楼代码
+        :param classroom_name: 教室名称关键字
+        """
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            day_of_week = dt.weekday() + 1 
+        except ValueError:
+            raise ValueError("日期格式错误，应为 YYYY-MM-DD")
+        
+        # 自动补全学期和周次信息
+        if not semester or not week:
+            term_info = self._get_current_term_info()
+            if not term_info:
+                # 尝试硬编码或从配置读取的默认值? 暂时抛出
+                if semester is None or week is None:
+                    raise Exception("无法获取当前学期信息，请手动指定 semester 和 week")
+            
+            # 如果没指定 semester，就用查到的
+            if not semester:
+                semester = term_info.get("DM") # 例如 "2025-2026-2"
+            
+            # 如果没指定 week，需查询日期对应的周次
+            if not week:
+                xn = term_info.get("XNDM") # "2025-2026"
+                xq = term_info.get("XQDM") # "2"
+                week_info = self._get_week_info(date_str, xn, xq)
+                
+                # 更新: 优先使用接口返回的星期几(XQJ)，因为它考虑了调休
+                if week_info:
+                    week = week_info.get("ZC")
+                    # XQJ: 1=周一 .. 7=周日
+                    if week_info.get("XQJ"):
+                        day_of_week = week_info.get("XQJ")
+                else:
+                    week = 1
+
+        query_setting = []
+        if campus_code:
+            query_setting.append({"name": "XXXQDM", "caption": "校区代码", "builder": "equal", "linkOpt": "AND", "value": campus_code})
+        if building_code:
+            query_setting.append({"name": "JXLDM", "caption": "教学楼代码", "builder": "equal", "linkOpt": "AND", "value": building_code})
+        if classroom_name:
+            query_setting.append({"name": "JASMC", "caption": "教学楼名称", "builder": "include", "linkOpt": "AND", "value": classroom_name})
+
+        all_classrooms = []
+        page_number = 1
+        page_size = 50
+        
+        url = f"{CONFIG['urls']['active']['jxzxehall_app']}/jwapp/sys/kxjas/modules/kxjas/cxjsqk.do"
+        
+        while True:
+            payload = {
+                'XNXQDM': semester,
+                'ZC': week,
+                'XQ': day_of_week,
+                'RQ': date_str,
+                'querySetting': json.dumps(query_setting),
+                '*order': '+JASMC',
+                'pageSize': page_size,
+                'pageNumber': page_number
+            }
+            
+            response = self.session.post(url, data=payload)
+            if response.status_code != 200:
+                raise Exception(f"请求失败，HTTP 状态码: {response.status_code}")
+                
+            data = response.json()
+            if 'datas' not in data or 'cxjsqk' not in data['datas']:
+                raise Exception("获取数据失败，可能是 Cookie 已过期或参数错误")
+                
+            page_data = data['datas']['cxjsqk']
+            rows = page_data.get('rows', [])
+            
+            for row in rows:
+                jasmc = row.get("JASMC")
+                room_info = {
+                    "name": jasmc,
+                    "building_code": row.get("JXLDM"),
+                    "type": row.get("JASLXDM_DISPLAY"),
+                    "seats": row.get("SKZWS"),
+                    "coordinates": get_building_coord(jasmc),
+                    "status": {}
+                }
+                # 遍历全天可能的 1-13 节课
+                for i in range(1, 14):
+                    jc_key = f"JC{i}"
+                    status_str = self._parse_jc_status(row.get(jc_key, ""))
+                    
+                    # 匹配时间段
+                    if i <= len(TIME_TABLE):
+                        t_start, t_end = TIME_TABLE[i-1]
+                        start_str = f"{t_start[0]:02d}:{t_start[1]:02d}"
+                        end_str = f"{t_end[0]:02d}:{t_end[1]:02d}"
+                    else:
+                        start_str, end_str = "", ""
+                        
+                    room_info["status"][i] = {
+                        "state": status_str,
+                        "start": start_str,
+                        "end": end_str
+                    }
+                        
+                all_classrooms.append(room_info)
+            
+            total_size = page_data.get('totalSize', 0)
+            if page_number * page_size >= total_size:
+                break
+            page_number += 1
+            
+        return all_classrooms
+
