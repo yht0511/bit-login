@@ -12,8 +12,8 @@ import glob
 from fastapi.responses import FileResponse
 # Import bit-login components
 from bit_login.service import jwb_login, jwb_cjd_login, jxzxehall_login
-from bit_login.services.jwb import jwb, jwb_cjd
-from bit_login.services.jxzxehall import jxzxehall
+from bit_login.services.jwb import score, cjd
+from bit_login.services.jxzxehall import course, credit
 from bit_login.login import login_error
 
 # Configure logging
@@ -38,6 +38,7 @@ ALLOWED_ORIGINS = [
     "https://deploy-preview-57--bit101-demo.netlify.app",
     "http://deploy-preview-57--bit101-demo.netlify.app"
 ]
+base_url = os.getenv("BASE_URL", "https://login.bit101.flwfdd.xyz")  
 
 
 app.add_middleware(
@@ -211,7 +212,7 @@ def get_jwb_all_score(request: JwbAllScoreRequest):
     Get all scores from JWB system.
     """
     result = execute_service(
-        jwb_login, jwb, 
+        jwb_login, score, 
         request.username, request.password, 'jwb', 
         'get_all_score', 
         detailed=request.detailed
@@ -226,7 +227,7 @@ def get_jwb_bit101_score(request: JwbScoreRequest):
     Get matching bit101 format scores from JWB system.
     """
     result = execute_service(
-        jwb_login, jwb, 
+        jwb_login, score, 
         request.username, request.password, 'jwb', 
         'get_bit101_score', 
         kksj=request.kksj, detailed=request.detail
@@ -242,7 +243,7 @@ def get_jwb_cjd_img(request: JwbAllScoreRequest):
     Get all scores from JWB system.
     """
     result = execute_service(
-        jwb_cjd_login, jwb_cjd, 
+        jwb_cjd_login, cjd, 
         request.username, request.password, 'jwb_cjd_img', 
         'get_cjd'
     )
@@ -256,7 +257,7 @@ def get_student_data(request: BaseCredentials):
     Get student personal information from JXZXEHALL.
     """
     result = execute_service(
-        jxzxehall_login, jxzxehall, 
+        jxzxehall_login, credit, 
         request.username, request.password, 'jxzxehall', 
         'get_student_data'
     )
@@ -268,7 +269,7 @@ def get_credit(request: BaseCredentials):
     Get student credit information.
     """
     result = execute_service(
-        jxzxehall_login, jxzxehall, 
+        jxzxehall_login, credit, 
         request.username, request.password, 'jxzxehall', 
         'get_credit'
     )
@@ -280,7 +281,7 @@ def get_courses(request: JxzxehallCoursesRequest):
     Get student courses (schedule).
     """
     result = execute_service(
-        jxzxehall_login, jxzxehall, 
+        jxzxehall_login, course, 
         request.username, request.password, 'jxzxehall', 
         'get_courses', 
         kksj=request.kksj
@@ -369,7 +370,7 @@ ICS_FILES = {}
 def generate_schedule_ics(request: JxzxehallCoursesRequest):
     global ICS_FILES
     ics_content, note = execute_service(
-        jxzxehall_login, jxzxehall, 
+        jxzxehall_login, course, 
         request.username, request.password, 'jxzxehall', 
         'generate_ics', 
         kksj=request.kksj
@@ -383,13 +384,13 @@ def generate_schedule_ics(request: JxzxehallCoursesRequest):
         f.write(ics_content)
 
     ICS_FILES[file_uuid] = {
-        "url": f"https://bit-login.teclab.org.cn/tmp/{file_uuid}.ics",
+        "url": f"{base_url}/tmp/{file_uuid}.ics",
         "file": file_path,
         "generated": time.time()
     }
         
     return {
-        "url": f"https://bit-login.teclab.org.cn/tmp/{file_uuid}.ics",
+        "url": f"{base_url}/tmp/{file_uuid}.ics",
         "note": note,
         "msg": "获取成功OvO"
     }

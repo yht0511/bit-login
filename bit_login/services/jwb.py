@@ -70,8 +70,13 @@ class score:
                 t.update(self.get_score_detail(CONFIG["urls"]["active"]["jwb_cb"]+data[-1].find('a')["onclick"].split("JsMod('")[1].split("'")[0][1:]))
             else:
                 t.update({
+                    'class_number': None,
+                    'major_number': None,
+                    'study_number': None,
                     'average': None,
                     'max': None,
+                    'entry_complete': None,
+                    'self_score': None,
                     'class_proportion': None,
                     'major_proportion': None,
                     'school_proportion': None,
@@ -82,15 +87,26 @@ class score:
     def parse_score_detail(self,data):
         parser = BeautifulSoup(data, 'html.parser')
         dataLists = parser.find_all(id='dataList')
-        class_detail=dataLists[1].find_all('tr')[-1]
-        class_detail=class_detail.find_all("td")
-        self_detail=dataLists[2].find_all("td")
+        
+        # Table 2
+        table2_rows = dataLists[1].find_all('tr')
+        row1_tds = table2_rows[0].find_all('td')
+        row2_tds = table2_rows[1].find_all('td')
+        
+        # Table 3
+        table3_tds = dataLists[2].find_all('td')
+        
         return {
-            'average':class_detail[0].string.split("：")[-1],
-            'max':class_detail[1].string.split("：")[-1],
-            'class_proportion':self_detail[1].string.split("：")[-1],
-            'major_proportion':self_detail[2].string.split("：")[-1],
-            'school_proportion':self_detail[3].string.split("：")[-1],
+            'class_number': row1_tds[0].text.split("：")[-1].strip(),
+            'major_number': row1_tds[1].text.split("：")[-1].strip(),
+            'study_number': row1_tds[2].text.split("：")[-1].strip(),
+            'average': row2_tds[0].text.split("：")[-1].strip(),
+            'max': row2_tds[1].text.split("：")[-1].strip(),
+            'entry_complete': row2_tds[2].text.split("：")[-1].strip(),
+            'self_score': table3_tds[0].text.split("：")[-1].strip(),
+            'class_proportion': table3_tds[1].text.split("：")[-1].strip(),
+            'major_proportion': table3_tds[2].text.split("：")[-1].strip(),
+            'school_proportion': table3_tds[3].text.split("：")[-1].strip(),
         }
     
     def get_all_score(self,detailed=False)->list:
@@ -157,11 +173,16 @@ class score:
                         detail_url = CONFIG["urls"]["active"]["jwb_cb"] + onclick_str.split("JsMod('")[1].split("'")[0][1:]
                         detail_data = self.get_score_detail(detail_url)
                         
-                        detail_list[2] = detail_data.get('average', '')
-                        detail_list[5] = detail_data.get('max', '')
-                        detail_list[7] = detail_data.get('class_proportion', '')
-                        detail_list[8] = detail_data.get('major_proportion', '')
-                        detail_list[9] = detail_data.get('school_proportion', '')
+                        detail_list[0] = detail_data.get('major_number', '')  # 专业人数
+                        detail_list[1] = detail_data.get('study_number', '')  # 学习人数
+                        detail_list[2] = detail_data.get('average', '')       # 平均分
+                        detail_list[3] = detail_data.get('self_score', '')    # 本人成绩
+                        detail_list[4] = detail_data.get('class_number', '')  # 班级人数
+                        detail_list[5] = detail_data.get('max', '')           # 最高分
+                        detail_list[6] = detail_data.get('entry_complete', '') # 录入完毕
+                        detail_list[7] = detail_data.get('class_proportion', '') # 班级占比
+                        detail_list[8] = detail_data.get('major_proportion', '') # 专业占比
+                        detail_list[9] = detail_data.get('school_proportion', '') # 全校占比
                     except Exception:
                         pass
                 row_data.extend(detail_list)
